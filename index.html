@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Catch The Dot — Simple HTML Game</title>
+  <title>Whack The Rat — Simple HTML Game</title>
   <style>
     :root{
       --bg:#0f172a; --card:#0b1220; --accent:#06b6d4; --muted:#94a3b8;
@@ -59,14 +59,18 @@
       user-select:none;
     }
 
-    .dot{
-      position:absolute; width:48px; height:48px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center; cursor:pointer;
+    .rat{
+      position:absolute; width:60px; height:60px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; cursor:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><g fill="%23654321"><path d="M4 4h4v4H4zm4 4h4v4H8zm4 4h4v4h-4zm4 4h4v4h-4zm4 0h4v4h-4zm4-4h4v4h-4zm0-4h4v4h-4z"/><path d="M8 8h16v4H8zm0 4h16v4H8zm4 4h8v4h-8z"/></g></svg>') 16 16, pointer;
+      background: #8B4513;
       box-shadow: 0 6px 18px rgba(4,8,20,0.6), inset 0 -6px 14px rgba(255,255,255,0.02);
       transition: transform 80ms linear;
+      font-size: 40px;
+      user-select: none;
     }
-    .dot .ring{ position:absolute; inset:-8px; border-radius:50%; filter:blur(6px); opacity:0.12;}
-    .dot .label{color:#001724; font-weight:800; font-size:14px;}
+    .rat:hover{
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><g fill="%23654321"><path d="M4 4h4v4H4zm4 4h4v4H8zm4 4h4v4h-4zm4 4h4v4h-4zm4 0h4v4h-4zm4-4h4v4h-4zm0-4h4v4h-4z"/><path d="M8 8h16v4H8zm0 4h16v4H8zm4 4h8v4h-8z"/></g></svg>') 16 16, pointer;
+    }
 
     /* footer tips */
     .tips{margin-top:12px; color:var(--muted); font-size:13px;}
@@ -80,8 +84,8 @@
 <body>
   <div class="wrap">
     <div class="panel">
-      <h1>Catch The Dot</h1>
-      <p class="muted">Click the moving dot as many times as you can. Each hit increases speed & score. Try beat your high score!</p>
+      <h1>Whack The Rat</h1>
+      <p class="muted">Whack the sneaky rat as many times as you can! Each hit increases speed & score. Try beat your high score!</p>
 
       <div class="scoreboard" style="margin-top:12px;">
         <div class="stat">Score<br><span id="score">0</span></div>
@@ -98,12 +102,12 @@
       </div>
 
       <div class="tips">
-        Tips: Aim for combo — if you click quickly, multiplier increases. Score saved locally.
+        Tips: Aim for combo — if you whack quickly, multiplier increases. Score saved locally.
       </div>
 
       <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
       <div style="font-size:13px; color:var(--muted)">
-        Controls: Click the dot. On mobile tap. Plays well on desktop & phone.
+        Controls: Click the rat to whack it. On mobile tap. Plays well on desktop & phone.
       </div>
     </div>
 
@@ -116,7 +120,7 @@
 
 <script>
 /*
-  Catch The Dot
+  Whack The Rat
   - Single-file HTML/JS game
   - Save as index.html and open in browser
 */
@@ -126,7 +130,7 @@ const GAME_DURATION = 30; // seconds
 const START_SPEED = 1000; // ms between moves initial
 const MIN_SPEED = 250; // ms minimum
 const SPEED_DEC = 60; // ms decrease per hit
-const DOT_SIZE = 48; // px
+const RAT_SIZE = 60; // px
 
 // State
 let score = 0;
@@ -137,7 +141,7 @@ let moveInterval = START_SPEED;
 let moveTimer = null;
 let countdownTimer = null;
 let lastHitTime = 0;
-let highScore = Number(localStorage.getItem('ctd_high') || 0);
+let highScore = Number(localStorage.getItem('wtr_high') || 0);
 
 // DOM
 const board = document.getElementById('board');
@@ -153,33 +157,32 @@ const gameArea = document.getElementById('gameArea');
 
 highEl.textContent = String(highScore);
 
-// Create dot
-const dot = document.createElement('div');
-dot.className = 'dot';
-dot.style.width = DOT_SIZE + 'px';
-dot.style.height = DOT_SIZE + 'px';
-dot.innerHTML = `<div class="ring"></div><div class="label">Tap</div>`;
-dot.style.background = 'linear-gradient(180deg,#34d399,#10b981)'; // green gradient
-dot.querySelector('.ring').style.background = 'radial-gradient(circle,#34d399,#10b981)';
+// Create rat
+const rat = document.createElement('div');
+rat.className = 'rat';
+rat.style.width = RAT_SIZE + 'px';
+rat.style.height = RAT_SIZE + 'px';
+rat.innerHTML = '🐀'; // rat emoji
+rat.title = 'Whack me!';
 
-board.appendChild(dot);
+board.appendChild(rat);
 
-// Utility: random position inside board while keeping dot fully visible
+// Utility: random position inside board while keeping rat fully visible
 function randomPos() {
   const rect = board.getBoundingClientRect();
   const padding = 12;
-  const maxX = Math.max(0, rect.width - DOT_SIZE - padding*2);
-  const maxY = Math.max(0, rect.height - DOT_SIZE - padding*2);
+  const maxX = Math.max(0, rect.width - RAT_SIZE - padding*2);
+  const maxY = Math.max(0, rect.height - RAT_SIZE - padding*2);
   const x = Math.round(Math.random() * maxX) + padding;
   const y = Math.round(Math.random() * maxY) + padding;
   return {x, y};
 }
 
-function moveDot() {
+function moveRat() {
   const pos = randomPos();
-  dot.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+  rat.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
   // small visual pop
-  dot.style.transition = `transform ${Math.max(80, moveInterval/6)}ms cubic-bezier(.2,.9,.3,1)`;
+  rat.style.transition = `transform ${Math.max(80, moveInterval/6)}ms cubic-bezier(.2,.9,.3,1)`;
 }
 
 // Score update
@@ -200,12 +203,12 @@ function startGame() {
   moveInterval = START_SPEED;
   lastHitTime = 0;
   updateHUD();
-  dot.style.display = 'block';
-  moveDot();
+  rat.style.display = 'block';
+  moveRat();
 
   // movement loop
   if (moveTimer) clearInterval(moveTimer);
-  moveTimer = setInterval(moveDot, moveInterval);
+  moveTimer = setInterval(moveRat, moveInterval);
 
   // countdown
   if (countdownTimer) clearInterval(countdownTimer);
@@ -238,7 +241,7 @@ function resetGame() {
   timeLeft = GAME_DURATION;
   multiplier = 1;
   moveInterval = START_SPEED;
-  dot.style.display = 'none';
+  rat.style.display = 'none';
   startBtn.textContent = 'Start';
   updateHUD();
 }
@@ -251,20 +254,20 @@ function endGame() {
   // update highscore
   if (score > highScore) {
     highScore = score;
-    localStorage.setItem('ctd_high', String(highScore));
+    localStorage.setItem('wtr_high', String(highScore));
   }
   updateHUD();
-  dot.style.display = 'none';
+  rat.style.display = 'none';
   startBtn.textContent = 'Start';
   alert(`Game over! Your score: ${score}\nHigh score: ${highScore}`);
 }
 
-// Click handler (hit)
-dot.addEventListener('click', (e)=>{
+// Click handler (whack)
+rat.addEventListener('click', (e)=>{
   if (!running) return;
-  // play small scale animation
-  dot.style.transform += ' scale(0.96)';
-  setTimeout(()=>{ moveDot(); }, 60);
+  // play small scale animation (whack effect)
+  rat.style.transform += ' scale(0.8)';
+  setTimeout(()=>{ moveRat(); }, 60);
 
   const now = Date.now();
   // quick hit -> increase multiplier
@@ -283,15 +286,15 @@ dot.addEventListener('click', (e)=>{
   moveInterval = Math.max(MIN_SPEED, moveInterval - SPEED_DEC);
   // restart movement timer with new interval
   if (moveTimer) clearInterval(moveTimer);
-  moveTimer = setInterval(moveDot, moveInterval);
+  moveTimer = setInterval(moveRat, moveInterval);
 
   updateHUD();
 });
 
-// Board click: small penalty if clicked outside dot (prevents mindless clicking)
+// Board click: small penalty if clicked outside rat (prevents mindless clicking)
 board.addEventListener('click', (e)=>{
   if (!running) return;
-  if (e.target !== dot) {
+  if (e.target !== rat) {
     score = Math.max(0, score - 5);
     multiplier = Math.max(1, Math.floor(multiplier/2));
     updateHUD();
@@ -311,7 +314,7 @@ resetBtn.addEventListener('click', ()=> {
   }
 });
 shareBtn.addEventListener('click', ()=> {
-  const text = `My score in Catch The Dot: ${score} (High: ${highScore}) — try beat me!`;
+  const text = `My score in Whack The Rat: ${score} (High: ${highScore}) — try beat me!`;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(()=> alert('Score copied to clipboard!'));
   } else {
@@ -319,13 +322,13 @@ shareBtn.addEventListener('click', ()=> {
   }
 });
 
-// Initialize: hide dot until start, random placement
+// Initialize: hide rat until start, random placement
 resetGame();
-moveDot();
+moveRat();
 
-// Resize: ensure dot stays in bounds on board resize by moving
+// Resize: ensure rat stays in bounds on board resize by moving
 window.addEventListener('resize', ()=> {
-  if (running) moveDot();
+  if (running) moveRat();
 });
 </script>
 </body>
