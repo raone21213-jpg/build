@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Catch The Dot — Simple HTML Game</title>
+  <style>
+    :root{
+      --bg:#0f172a; --card:#0b1220; --accent:#06b6d4; --muted:#94a3b8;
+    }
+    html,body{height:100%; margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;}
+    body{
+      display:flex; align-items:center; justify-content:center;
+      background: radial-gradient(circle at 10% 10%, #071029 0%, var(--bg) 40%);
+      color: #e6eef6;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    .wrap{
+      width: 920px; max-width:96vw; margin:32px; padding:20px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px; box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      display:grid; grid-template-columns: 320px 1fr; gap:18px; align-items:start;
+    }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px; padding:14px;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    h1{font-size:20px; margin:0 0 8px 0;}
+    p.muted{color:var(--muted); margin:0 0 10px 0; font-size:13px;}
+
+    .scoreboard{display:flex; gap:8px; flex-wrap:wrap;}
+    .stat{
+      padding:8px 12px; background:rgba(255,255,255,0.02); border-radius:10px; min-width:86px;
+      text-align:center; font-weight:600;
+    }
+    .controls{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+    button{
+      background:linear-gradient(180deg,var(--accent),#0891b2);
+      border:none; color:#052026; padding:8px 12px; border-radius:8px; cursor:pointer;
+      font-weight:700;
+    }
+    button.ghost{background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted); font-weight:600;}
+    button:active{transform:translateY(1px);}
+
+    /* Game area */
+    .game-area{
+      height:540px; border-radius:12px; overflow:hidden; position:relative;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.05));
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    #board{
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      user-select:none;
+    }
+
+    .dot{
+      position:absolute; width:48px; height:48px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      box-shadow: 0 6px 18px rgba(4,8,20,0.6), inset 0 -6px 14px rgba(255,255,255,0.02);
+      transition: transform 80ms linear;
+    }
+    .dot .ring{ position:absolute; inset:-8px; border-radius:50%; filter:blur(6px); opacity:0.12;}
+    .dot .label{color:#001724; font-weight:800; font-size:14px;}
+
+    /* footer tips */
+    .tips{margin-top:12px; color:var(--muted); font-size:13px;}
+
+    /* responsive */
+    @media (max-width:860px){
+      .wrap{grid-template-columns: 1fr; padding:12px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Catch The Dot</h1>
+      <p class="muted">Click the moving dot as many times as you can. Each hit increases speed & score. Try beat your high score!</p>
+
+      <div class="scoreboard" style="margin-top:12px;">
+        <div class="stat">Score<br><span id="score">0</span></div>
+        <div class="stat">Time<br><span id="time">30</span>s</div>
+        <div class="stat">Multiplier<br><span id="mult">1×</span></div>
+        <div class="stat">High<br><span id="high">0</span></div>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn" class="ghost">Pause</button>
+        <button id="resetBtn" class="ghost">Reset</button>
+        <button id="shareBtn" class="ghost">Share Score</button>
+      </div>
+
+      <div class="tips">
+        Tips: Aim for combo — if you click quickly, multiplier increases. Score saved locally.
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
+      <div style="font-size:13px; color:var(--muted)">
+        Controls: Click the dot. On mobile tap. Plays well on desktop & phone.
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;">
+      <div class="game-area" id="gameArea">
+        <div id="board"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  Catch The Dot
+  - Single-file HTML/JS game
+  - Save as index.html and open in browser
+*/
+
+// Config
+const GAME_DURATION = 30; // seconds
+const START_SPEED = 1000; // ms between moves initial
+const MIN_SPEED = 250; // ms minimum
+const SPEED_DEC = 60; // ms decrease per hit
+const DOT_SIZE = 48; // px
+
+// State
+let score = 0;
+let timeLeft = GAME_DURATION;
+let multiplier = 1;
+let running = false;
+let moveInterval = START_SPEED;
+let moveTimer = null;
+let countdownTimer = null;
+let lastHitTime = 0;
+let highScore = Number(localStorage.getItem('ctd_high') || 0);
+
+// DOM
+const board = document.getElementById('board');
+const scoreEl = document.getElementById('score');
+const timeEl = document.getElementById('time');
+const multEl = document.getElementById('mult');
+const highEl = document.getElementById('high');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const shareBtn = document.getElementById('shareBtn');
+const gameArea = document.getElementById('gameArea');
+
+highEl.textContent = String(highScore);
+
+// Create dot
+const dot = document.createElement('div');
+dot.className = 'dot';
+dot.style.width = DOT_SIZE + 'px';
+dot.style.height = DOT_SIZE + 'px';
+dot.innerHTML = `<div class="ring"></div><div class="label">Tap</div>`;
+dot.style.background = 'linear-gradient(180deg,#34d399,#10b981)'; // green gradient
+dot.querySelector('.ring').style.background = 'radial-gradient(circle,#34d399,#10b981)';
+
+board.appendChild(dot);
+
+// Utility: random position inside board while keeping dot fully visible
+function randomPos() {
+  const rect = board.getBoundingClientRect();
+  const padding = 12;
+  const maxX = Math.max(0, rect.width - DOT_SIZE - padding*2);
+  const maxY = Math.max(0, rect.height - DOT_SIZE - padding*2);
+  const x = Math.round(Math.random() * maxX) + padding;
+  const y = Math.round(Math.random() * maxY) + padding;
+  return {x, y};
+}
+
+function moveDot() {
+  const pos = randomPos();
+  dot.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+  // small visual pop
+  dot.style.transition = `transform ${Math.max(80, moveInterval/6)}ms cubic-bezier(.2,.9,.3,1)`;
+}
+
+// Score update
+function updateHUD() {
+  scoreEl.textContent = String(score);
+  timeEl.textContent = String(timeLeft.toFixed(0));
+  multEl.textContent = multiplier + '×';
+  highEl.textContent = String(highScore);
+}
+
+// Game logic
+function startGame() {
+  if (running) return;
+  running = true;
+  score = 0;
+  timeLeft = GAME_DURATION;
+  multiplier = 1;
+  moveInterval = START_SPEED;
+  lastHitTime = 0;
+  updateHUD();
+  dot.style.display = 'block';
+  moveDot();
+
+  // movement loop
+  if (moveTimer) clearInterval(moveTimer);
+  moveTimer = setInterval(moveDot, moveInterval);
+
+  // countdown
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    timeLeft -= 1;
+    if (timeLeft <= 0) {
+      endGame();
+    }
+    updateHUD();
+  }, 1000);
+
+  startBtn.textContent = 'Playing...';
+  pauseBtn.classList.remove('ghost');
+}
+
+function pauseGame() {
+  if (!running) return;
+  running = false;
+  if (moveTimer) clearInterval(moveTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
+  startBtn.textContent = 'Resume';
+  pauseBtn.classList.add('ghost');
+}
+
+function resetGame() {
+  running = false;
+  if (moveTimer) clearInterval(moveTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
+  score = 0;
+  timeLeft = GAME_DURATION;
+  multiplier = 1;
+  moveInterval = START_SPEED;
+  dot.style.display = 'none';
+  startBtn.textContent = 'Start';
+  updateHUD();
+}
+
+function endGame() {
+  running = false;
+  if (moveTimer) clearInterval(moveTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
+
+  // update highscore
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('ctd_high', String(highScore));
+  }
+  updateHUD();
+  dot.style.display = 'none';
+  startBtn.textContent = 'Start';
+  alert(`Game over! Your score: ${score}\nHigh score: ${highScore}`);
+}
+
+// Click handler (hit)
+dot.addEventListener('click', (e)=>{
+  if (!running) return;
+  e.stopPropagation(); // prevent board click penalty on successful hit
+  // play small scale animation
+  dot.style.transform += ' scale(0.96)';
+  setTimeout(()=>{ moveDot(); }, 60);
+
+  const now = Date.now();
+  // quick hit -> increase multiplier
+  if (now - lastHitTime < 900) {
+    multiplier = Math.min(10, multiplier + 1);
+  } else {
+    multiplier = Math.max(1, Math.floor(multiplier/2));
+  }
+  lastHitTime = now;
+
+  // score math
+  const points = 10 * multiplier;
+  score += points;
+
+  // increase difficulty
+  moveInterval = Math.max(MIN_SPEED, moveInterval - SPEED_DEC);
+  // restart movement timer with new interval
+  if (moveTimer) clearInterval(moveTimer);
+  moveTimer = setInterval(moveDot, moveInterval);
+
+  updateHUD();
+});
+
+// Board click: small penalty if clicked outside dot (prevents mindless clicking)
+board.addEventListener('click', (e)=>{
+  if (!running) return;
+  if (!e.target.closest('.dot')) {
+    score = Math.max(0, score - 5);
+    multiplier = Math.max(1, Math.floor(multiplier/2));
+    updateHUD();
+  }
+});
+
+// Buttons
+startBtn.addEventListener('click', ()=> {
+  if (!running) startGame(); else pauseGame();
+});
+pauseBtn.addEventListener('click', ()=> {
+  if (running) pauseGame(); else startGame();
+});
+resetBtn.addEventListener('click', ()=> {
+  if (confirm('Reset game?')) {
+    resetGame();
+  }
+});
+shareBtn.addEventListener('click', ()=> {
+  const text = `My score in Catch The Dot: ${score} (High: ${highScore}) — try beat me!`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(()=> alert('Score copied to clipboard!'));
+  } else {
+    alert(text);
+  }
+});
+
+// Initialize: hide dot until start, random placement
+resetGame();
+moveDot();
+
+// Resize: ensure dot stays in bounds on board resize by moving
+window.addEventListener('resize', ()=> {
+  if (running) moveDot();
+});
+</script>
+</body>
+</html>
